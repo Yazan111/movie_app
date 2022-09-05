@@ -1,0 +1,156 @@
+import 'package:flutter/material.dart';
+import 'package:movie_app/src/core/style/color.dart';
+import 'package:movie_app/src/domain/entities/movie.dart';
+import 'package:movie_app/src/view/screens/home/controllers/helpers.dart';
+import 'package:movie_app/src/view/widgets/error_body.dart';
+import 'package:movie_app/src/view/widgets/movie_container.dart';
+import 'package:movie_app/src/view/screens/home/controllers/popular_movies_controller.dart';
+import 'package:provider/provider.dart';
+import 'package:sizer/sizer.dart';
+
+class BuildPopularMovies extends StatefulWidget {
+  const BuildPopularMovies({
+    Key key,
+  }) : super(key: key);
+
+  @override
+  _BuildPopularMoviesState createState() => _BuildPopularMoviesState();
+}
+
+class _BuildPopularMoviesState extends State<BuildPopularMovies> {
+  var _buildMovies;
+  ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    var movieController = context.read<GetPopularMoviesController>();
+    _buildMovies = movieController.getMovies();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        //when we are at the bottom of the page
+        movieController.refreshStatus = RefreshStatus.static;
+        movieController.getMovies();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var movieController = context.watch<GetPopularMoviesController>();
+
+    return RefreshIndicator(
+      color: AppColor.yellow,
+      onRefresh: () async {
+        movieController.refreshStatus = RefreshStatus.refreshing;
+        await movieController.getMovies();
+      },
+      child: FutureBuilder<List<MovieEntity>>(
+        future: _buildMovies,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return SizerUtil.orientation == Orientation.portrait
+                ? _BuildPopularMoviesListView(
+                    scrollController: _scrollController,
+                    moviesProvider: movieController,
+                  )
+                : _BuildPopularMoviesGridView(
+                    moviesProvider: movieController,
+                    scrollController: _scrollController,
+                  );
+          } else if (snapshot.hasError) {
+            return ErrorBody(
+              message: snapshot.error,
+              refresh: () {
+                movieController.refreshStatus = RefreshStatus.static;
+                _buildMovies = movieController.getMovies();
+              },
+            );
+          }
+
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColor.yellow),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BuildPopularMoviesListView extends StatelessWidget {
+  const _BuildPopularMoviesListView({
+    Key key,
+    this.moviesProvider,
+    this.scrollController,
+  }) : super(key: key);
+
+  final GetPopularMoviesController moviesProvider;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      controller: scrollController,
+      itemCount: moviesProvider.movies.length,
+      itemBuilder: (context, index) {
+        var movie = moviesProvider.movies[index];
+
+        // show loading more indicator at last movie on current page
+        if (index == moviesProvider.movies.length - 1) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColor.yellow),
+            ),
+          );
+        }
+
+        return MovieContainer(movie: movie);
+      },
+    );
+  }
+}
+
+class _BuildPopularMoviesGridView extends StatelessWidget {
+  const _BuildPopularMoviesGridView({
+    Key key,
+    this.moviesProvider,
+    this.scrollController,
+  }) : super(key: key);
+
+  final GetPopularMoviesController moviesProvider;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      controller: scrollController,
+      itemCount: moviesProvider.movies.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+      ),
+      itemBuilder: (context, index) {
+        var movie = moviesProvider.movies[index];
+
+        // show loading more indicator at last movie on current page
+        if (index == moviesProvider.movies.length - 1) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColor.yellow),
+            ),
+          );
+        }
+
+        return MovieContainer(movie: movie);
+      },
+    );
+  }
+}

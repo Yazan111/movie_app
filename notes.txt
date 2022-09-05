@@ -1,0 +1,4 @@
+* gradle is located in .grade/wrapper/dist. its better to download its files manually thant 
+to let the framework handle it. 
+
+
